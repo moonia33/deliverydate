@@ -2,7 +2,7 @@
 <module>
     <name>deliverydate</name>
     <displayName><![CDATA[Pristatymo data]]></displayName>
-    <version><![CDATA[1.0.1]]></version>
+    <version><![CDATA[1.0.2]]></version>
     <description><![CDATA[Rankiniu būdu arba per cron atnaujina pristatymo datą prekės puslapyje (per „Prekių, esančių sandėlyje, pristatymo laikas“) ir kurjerių pasirinkime.]]></description>
     <author><![CDATA[moonia]]></author>
     <tab><![CDATA[shipping_logistics]]></tab>

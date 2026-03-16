@@ -9,16 +9,18 @@ class Deliverydate extends Module
     public const CONFIG_MODE = 'DELIVERYDATE_MODE';
     public const CONFIG_DAYS = 'DELIVERYDATE_DAYS';
     public const CONFIG_DATE = 'DELIVERYDATE_DATE';
+    public const CONFIG_TEXT = 'DELIVERYDATE_TEXT';
     public const CONFIG_CRON_TOKEN = 'DELIVERYDATE_CRON_TOKEN';
 
     private const MODE_DAYS = 'days';
     private const MODE_DATE = 'date';
+    private const MODE_TEXT = 'text';
 
     public function __construct()
     {
         $this->name = 'deliverydate';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.0.1';
+        $this->version = '1.0.2';
         $this->author = 'moonia';
         $this->need_instance = 0;
 
@@ -57,6 +59,10 @@ class Deliverydate extends Module
             Configuration::updateValue(self::CONFIG_DATE, '');
         }
 
+        if (Configuration::get(self::CONFIG_TEXT) === false) {
+            Configuration::updateValue(self::CONFIG_TEXT, '');
+        }
+
         if (!Configuration::get(self::CONFIG_CRON_TOKEN)) {
             Configuration::updateValue(self::CONFIG_CRON_TOKEN, Tools::passwdGen(32));
         }
@@ -69,6 +75,7 @@ class Deliverydate extends Module
         return Configuration::deleteByName(self::CONFIG_MODE)
             && Configuration::deleteByName(self::CONFIG_DAYS)
             && Configuration::deleteByName(self::CONFIG_DATE)
+            && Configuration::deleteByName(self::CONFIG_TEXT)
             && Configuration::deleteByName(self::CONFIG_CRON_TOKEN);
     }
 
@@ -80,14 +87,16 @@ class Deliverydate extends Module
             $mode = (string) Tools::getValue(self::CONFIG_MODE);
             $days = Tools::getValue(self::CONFIG_DAYS);
             $date = (string) Tools::getValue(self::CONFIG_DATE);
+            $text = (string) Tools::getValue(self::CONFIG_TEXT);
 
-            $errors = $this->validateConfig($mode, $days, $date);
+            $errors = $this->validateConfig($mode, $days, $date, $text);
             if (!empty($errors)) {
                 $output .= $this->displayError(implode('<br>', $errors));
             } else {
                 Configuration::updateValue(self::CONFIG_MODE, $mode);
                 Configuration::updateValue(self::CONFIG_DAYS, (int) $days);
                 Configuration::updateValue(self::CONFIG_DATE, $date);
+                Configuration::updateValue(self::CONFIG_TEXT, $text);
 
                 if ($this->runUpdate()) {
                     $output .= $this->displayConfirmation(
@@ -126,11 +135,11 @@ class Deliverydate extends Module
      *
      * @return string[]
      */
-    private function validateConfig($mode, $days, $date)
+    private function validateConfig($mode, $days, $date, $text)
     {
         $errors = [];
 
-        if ($mode !== self::MODE_DAYS && $mode !== self::MODE_DATE) {
+        if ($mode !== self::MODE_DAYS && $mode !== self::MODE_DATE && $mode !== self::MODE_TEXT) {
             $errors[] = $this->trans('Neteisingas režimas.', [], 'Modules.Deliverydate.Admin');
             return $errors;
         }
@@ -150,6 +159,17 @@ class Deliverydate extends Module
                 $errors[] = $this->trans('Nurodykite konkrečią datą.', [], 'Modules.Deliverydate.Admin');
             } elseif (!Validate::isDateFormat($date)) {
                 $errors[] = $this->trans('Data turi būti formatu YYYY-MM-DD.', [], 'Modules.Deliverydate.Admin');
+            }
+        }
+
+        if ($mode === self::MODE_TEXT) {
+            $text = trim($text);
+            if ($text === '') {
+                $errors[] = $this->trans('Nurodykite laisvą tekstą.', [], 'Modules.Deliverydate.Admin');
+            } elseif (!Validate::isCleanHtml($text)) {
+                $errors[] = $this->trans('Laisvas tekstas turi būti paprastas tekstas (be nesaugaus HTML).', [], 'Modules.Deliverydate.Admin');
+            } elseif (Tools::strlen($text) > 255) {
+                $errors[] = $this->trans('Laisvas tekstas per ilgas (maks. 255 simboliai).', [], 'Modules.Deliverydate.Admin');
             }
         }
 
@@ -184,6 +204,11 @@ class Deliverydate extends Module
                                 'value' => self::MODE_DATE,
                                 'label' => $this->trans('Konkreti data', [], 'Modules.Deliverydate.Admin'),
                             ],
+                            [
+                                'id' => 'deliverydate_mode_text',
+                                'value' => self::MODE_TEXT,
+                                'label' => $this->trans('Laisvas tekstas', [], 'Modules.Deliverydate.Admin'),
+                            ],
                         ],
                     ],
                     [
@@ -198,6 +223,12 @@ class Deliverydate extends Module
                         'label' => $this->trans('Konkreti data', [], 'Modules.Deliverydate.Admin'),
                         'name' => self::CONFIG_DATE,
                         'desc' => $this->trans('Naudojama tik kai pasirinktas „konkreti data“ režimas.', [], 'Modules.Deliverydate.Admin'),
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->trans('Laisvas tekstas', [], 'Modules.Deliverydate.Admin'),
+                        'name' => self::CONFIG_TEXT,
+                        'desc' => $this->trans('Naudojama tik kai pasirinktas „laisvas tekstas“ režimas.', [], 'Modules.Deliverydate.Admin'),
                     ],
                 ],
                 'submit' => [
@@ -247,6 +278,7 @@ class Deliverydate extends Module
             self::CONFIG_MODE => Configuration::get(self::CONFIG_MODE) ?: self::MODE_DAYS,
             self::CONFIG_DAYS => (int) Configuration::get(self::CONFIG_DAYS),
             self::CONFIG_DATE => (string) Configuration::get(self::CONFIG_DATE),
+            self::CONFIG_TEXT => (string) Configuration::get(self::CONFIG_TEXT),
         ];
     }
 
@@ -281,7 +313,7 @@ class Deliverydate extends Module
     /**
      * @return string|null
      */
-    private function getComputedDate()
+    private function getComputedValue()
     {
         $mode = (string) Configuration::get(self::CONFIG_MODE);
 
@@ -289,6 +321,15 @@ class Deliverydate extends Module
             $date = (string) Configuration::get(self::CONFIG_DATE);
             if (Validate::isDateFormat($date)) {
                 return $date;
+            }
+
+            return null;
+        }
+
+        if ($mode === self::MODE_TEXT) {
+            $text = trim((string) Configuration::get(self::CONFIG_TEXT));
+            if ($text !== '') {
+                return $text;
             }
 
             return null;
@@ -325,12 +366,12 @@ class Deliverydate extends Module
      */
     public function runUpdate()
     {
-        $date = $this->getComputedDate();
-        if (!$date) {
+        $value = $this->getComputedValue();
+        if (!$value) {
             return false;
         }
 
-        return $this->applyDateToStore($date);
+        return $this->applyValueToStore($value);
     }
 
     /**
@@ -338,13 +379,13 @@ class Deliverydate extends Module
      *
      * @return bool
      */
-    private function applyDateToStore($date)
+    private function applyValueToStore($value)
     {
-        $dateSql = pSQL($date);
+        $valueSql = pSQL($value);
 
         $deliveryTimeLabels = [];
         foreach (Language::getLanguages(false) as $lang) {
-            $deliveryTimeLabels[(int) $lang['id_lang']] = $dateSql;
+            $deliveryTimeLabels[(int) $lang['id_lang']] = $valueSql;
         }
 
         $ok = Configuration::updateValue('PS_LABEL_DELIVERY_TIME_AVAILABLE', $deliveryTimeLabels);
@@ -352,7 +393,7 @@ class Deliverydate extends Module
         $ok = $ok && Db::getInstance()->execute('
             UPDATE `' . _DB_PREFIX_ . 'carrier_lang` cl
             INNER JOIN `' . _DB_PREFIX_ . 'carrier` c ON c.`id_carrier` = cl.`id_carrier`
-            SET cl.`delay` = \'' . $dateSql . '\'
+            SET cl.`delay` = \'' . $valueSql . '\'
             WHERE c.`deleted` = 0
         ');
 

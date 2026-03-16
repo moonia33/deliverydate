@@ -31,6 +31,7 @@ Modulio nustatymuose pasirinkite vieną režimą:
 
 1. **Dienų skaičius** – kiek dienų pridėti prie šiandienos datos
 2. **Konkreti data** – fiksuota data `YYYY-MM-DD`
+3. **Laisvas tekstas** – įrašomas tekstas (pvz. „Pristatymas rytoj“)
 
 Išsaugojus nustatymus, modulis iškart atnaujina pristatymo laiką ir kurjerius.
 Taip pat yra mygtukas **Atnaujinti dabar** (nekeičiant nustatymų).
